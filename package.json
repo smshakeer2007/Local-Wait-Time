@@ -1,0 +1,19 @@
+{
+  "name": "localwait-times-monorepo",
+  "version": "1.0.0",
+  "description": "LocalWait Times - Community-submitted wait-time journal for local service counters",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "server",
+    "client"
+  ],
+  "scripts": {
+    "build": "npm install --prefix server && npm install --prefix client && npm run build --prefix client",
+    "start": "node server/src/index.js",
+    "seed": "node server/src/scripts/seed.js",
+    "dev:server": "cd server && npm run dev",
+    "dev:client": "cd client && npm run dev",
+    "dev:db": "cd server && npm run db"
+  }
+}
