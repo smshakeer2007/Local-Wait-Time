@@ -2,7 +2,8 @@ import express from 'express';
 import {
   getPlaces,
   createPlace,
-  getPlaceById
+  getPlaceById,
+  deletePlace
 } from '../controllers/placeController.js';
 import {
   createReport,
@@ -29,6 +30,9 @@ router.post('/', postLimiter, validateCreatePlace, createPlace);
 
 // GET /api/places/:id
 router.get('/:id', validateObjectId('id'), getPlaceById);
+
+// DELETE /api/places/:id
+router.delete('/:id', validateObjectId('id'), deletePlace);
 
 // GET /api/places/:id/stats
 router.get('/:id/stats', validateObjectId('id'), validateGetStatsQuery, getPlaceStats);

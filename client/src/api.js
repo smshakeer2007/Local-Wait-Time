@@ -66,6 +66,12 @@ export const api = {
     return request(`/places/${id}`);
   },
 
+  deletePlace: (id) => {
+    return request(`/places/${id}`, {
+      method: 'DELETE'
+    });
+  },
+
   // Stats
   getPlaceStats: (id, dayType = 'All') => {
     const params = new URLSearchParams();

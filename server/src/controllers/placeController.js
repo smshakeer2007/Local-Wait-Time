@@ -126,3 +126,37 @@ export const getPlaceById = asyncHandler(async (req, res) => {
     }
   });
 });
+
+/**
+ * DELETE /api/places/:id
+ * Delete a place and cascade delete its associated wait reports
+ */
+export const deletePlace = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+
+  const place = await Place.findById(id);
+  if (!place) {
+    return res.status(404).json({
+      success: false,
+      error: {
+        message: 'Place not found'
+      }
+    });
+  }
+
+  // Cascade delete all wait reports associated with this place
+  const deleteReportsResult = await WaitReport.deleteMany({ place: id });
+
+  // Delete the place itself
+  await Place.findByIdAndDelete(id);
+
+  res.status(200).json({
+    success: true,
+    data: {
+      id,
+      name: place.name,
+      deletedReportsCount: deleteReportsResult.deletedCount,
+      message: `Place "${place.name}" and ${deleteReportsResult.deletedCount} associated wait reports removed successfully`
+    }
+  });
+});

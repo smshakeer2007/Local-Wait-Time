@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft,
   MapPin,
@@ -15,7 +15,9 @@ import {
   Sparkles,
   Zap,
   TrendingUp,
-  Tag
+  Tag,
+  Trash2,
+  AlertTriangle
 } from 'lucide-react';
 import { api } from '../api.js';
 import { Badge } from '../components/Badge.jsx';
@@ -57,6 +59,7 @@ const QUICK_TAGS = ['Fast Counter', 'Lunch Rush', 'Token System', 'Single Clerk'
 
 export const PlaceDetailPage = () => {
   const { id } = useParams();
+  const navigate = useNavigate();
   const { showToast } = useToast();
 
   // Place & Stats state
@@ -70,6 +73,10 @@ export const PlaceDetailPage = () => {
   const [loadingStats, setLoadingStats] = useState(true);
   const [loadingReports, setLoadingReports] = useState(true);
   const [error, setError] = useState(null);
+
+  // Delete modal state
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   // "Log my wait" form state
   const [waitMinutes, setWaitMinutes] = useState('');
@@ -227,6 +234,20 @@ export const PlaceDetailPage = () => {
     setNote((prev) => (prev ? `${prev}, ${tag}` : tag).slice(0, 200));
   };
 
+  // Delete Place handler
+  const handleDeletePlace = async () => {
+    try {
+      setDeleting(true);
+      await api.deletePlace(id);
+      showToast(`Service place "${place.name}" removed successfully.`, 'success');
+      navigate('/', { replace: true });
+    } catch (err) {
+      showToast(err.message || 'Failed to remove service place', 'error');
+      setDeleting(false);
+      setShowDeleteModal(false);
+    }
+  };
+
   if (loadingPlace) {
     return (
       <div className="max-w-6xl mx-auto px-4 py-16">
@@ -260,7 +281,7 @@ export const PlaceDetailPage = () => {
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-10 space-y-8">
       {/* Navigation & Action Bar */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-3 flex-wrap">
         <Link
           to="/"
           className="inline-flex items-center gap-2 text-xs font-bold text-slate-600 hover:text-emerald-700 bg-white px-3.5 py-2 rounded-xl border border-slate-200/90 shadow-2xs transition"
@@ -269,14 +290,26 @@ export const PlaceDetailPage = () => {
           <span>Back to All Places</span>
         </Link>
 
-        <button
-          type="button"
-          onClick={handleCopyLink}
-          className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-700 hover:text-slate-900 bg-white px-3.5 py-2 rounded-xl border border-slate-200 shadow-2xs hover:bg-slate-50 transition"
-        >
-          <Share2 className="w-3.5 h-3.5 text-slate-500" />
-          <span>Share Location</span>
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={handleCopyLink}
+            className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-700 hover:text-slate-900 bg-white px-3.5 py-2 rounded-xl border border-slate-200 shadow-2xs hover:bg-slate-50 transition"
+          >
+            <Share2 className="w-3.5 h-3.5 text-slate-500" />
+            <span>Share Location</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setShowDeleteModal(true)}
+            className="inline-flex items-center gap-1.5 text-xs font-semibold text-rose-600 hover:text-white hover:bg-rose-600 bg-rose-50/80 px-3.5 py-2 rounded-xl border border-rose-200 shadow-2xs transition"
+            title="Remove this service place"
+          >
+            <Trash2 className="w-3.5 h-3.5 text-rose-500 hover:text-white" />
+            <span>Remove Place</span>
+          </button>
+        </div>
       </div>
 
       {/* Place Header Hero Banner */}
@@ -669,6 +702,72 @@ export const PlaceDetailPage = () => {
           </div>
         </div>
       </div>
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="delete-place-title"
+        >
+          <div className="bg-white rounded-3xl border border-slate-200 p-6 sm:p-8 max-w-md w-full shadow-2xl space-y-5 animate-in zoom-in-95 duration-200">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-2xl bg-rose-50 border border-rose-100 flex items-center justify-center flex-shrink-0 text-rose-600">
+                <AlertTriangle className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 id="delete-place-title" className="text-lg font-black text-slate-900">
+                  Remove Service Place?
+                </h3>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Permanent removal from LocalWait Times
+                </p>
+              </div>
+            </div>
+
+            <div className="bg-slate-50 rounded-2xl p-4 border border-slate-100 text-xs text-slate-600 space-y-2 leading-relaxed">
+              <p>
+                Are you sure you want to permanently remove{' '}
+                <strong className="text-slate-900 font-bold">{place.name}</strong>?
+              </p>
+              <p className="text-rose-600 font-medium">
+                ⚠️ This will also permanently delete all{' '}
+                <strong>{place.reportCount || 0} user-reported wait records</strong> submitted for this counter.
+              </p>
+            </div>
+
+            <div className="flex items-center justify-end gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setShowDeleteModal(false)}
+                disabled={deleting}
+                className="px-4 py-2.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-700 hover:bg-slate-50 transition disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleDeletePlace}
+                disabled={deleting}
+                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold shadow-md shadow-rose-600/20 transition disabled:opacity-50"
+              >
+                {deleting ? (
+                  <>
+                    <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    <span>Removing...</span>
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="w-4 h-4" />
+                    <span>Yes, Remove Place</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

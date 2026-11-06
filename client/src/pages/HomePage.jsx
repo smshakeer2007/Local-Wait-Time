@@ -17,7 +17,9 @@ import {
   LayoutGrid,
   ListFilter,
   CheckCircle2,
-  Share2
+  Share2,
+  Trash2,
+  AlertTriangle
 } from 'lucide-react';
 import { api } from '../api.js';
 import { Badge } from '../components/Badge.jsx';
@@ -51,6 +53,10 @@ export const HomePage = () => {
   const [page, setPage] = useState(1);
   const [sortBy, setSortBy] = useState('reports-desc'); // 'reports-desc' | 'name-asc' | 'recent'
   const [viewMode, setViewMode] = useState('grid'); // 'grid' | 'list'
+
+  // Delete modal state
+  const [placeToDelete, setPlaceToDelete] = useState(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const fetchPlaces = async () => {
     try {
@@ -111,6 +117,27 @@ export const HomePage = () => {
     if (navigator.clipboard) {
       navigator.clipboard.writeText(window.location.origin);
       showToast('App link copied to clipboard! Share it with your neighbors.', 'success');
+    }
+  };
+
+  // Delete handler
+  const handleConfirmDelete = async () => {
+    if (!placeToDelete) return;
+    try {
+      setIsDeleting(true);
+      const targetId = placeToDelete.id || placeToDelete._id;
+      await api.deletePlace(targetId);
+      showToast(`"${placeToDelete.name}" removed successfully.`, 'success');
+      setPlaces((prev) => prev.filter((p) => (p.id || p._id) !== targetId));
+      setPagination((prev) => ({
+        ...prev,
+        total: Math.max(0, prev.total - 1)
+      }));
+      setPlaceToDelete(null);
+    } catch (err) {
+      showToast(err.message || 'Failed to remove service place', 'error');
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -349,28 +376,44 @@ export const HomePage = () => {
           >
             {sortedPlaces.map((place) => {
               const placeId = place.id || place._id;
-              const hasReports = (place.reportCount || 0) > 0;
 
               return (
-                <Link
+                <div
                   key={placeId}
-                  to={`/places/${placeId}`}
                   className="group relative bg-white rounded-2xl border border-slate-200/90 p-6 shadow-xs hover:shadow-xl hover:border-emerald-400 hover:-translate-y-1 transition-all duration-300 flex flex-col justify-between overflow-hidden"
                 >
                   {/* Top Ambient Card Glow on Hover */}
                   <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/5 rounded-full blur-2xl group-hover:bg-emerald-500/15 transition-all duration-300 pointer-events-none" />
 
                   <div>
-                    {/* Header Badges */}
+                    {/* Header Badges & Actions */}
                     <div className="flex items-start justify-between gap-2 mb-3">
-                      <Badge variant="category" category={place.category} />
-                      <Badge variant="user-reported" size="sm" />
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <Badge variant="category" category={place.category} />
+                        <Badge variant="user-reported" size="sm" />
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          setPlaceToDelete(place);
+                        }}
+                        className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition"
+                        title={`Remove ${place.name}`}
+                        aria-label={`Remove ${place.name}`}
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
                     </div>
 
                     {/* Place Name */}
-                    <h3 className="font-extrabold text-slate-900 group-hover:text-emerald-700 transition text-lg leading-snug line-clamp-2 mb-2">
-                      {place.name}
-                    </h3>
+                    <Link to={`/places/${placeId}`} className="block">
+                      <h3 className="font-extrabold text-slate-900 group-hover:text-emerald-700 transition text-lg leading-snug line-clamp-2 mb-2">
+                        {place.name}
+                      </h3>
+                    </Link>
 
                     {/* Address */}
                     {place.address && (
@@ -389,12 +432,15 @@ export const HomePage = () => {
                       <span>community report{place.reportCount === 1 ? '' : 's'}</span>
                     </div>
 
-                    <span className="inline-flex items-center gap-1 font-bold text-emerald-700 group-hover:translate-x-1 transition-transform">
+                    <Link
+                      to={`/places/${placeId}`}
+                      className="inline-flex items-center gap-1 font-bold text-emerald-700 hover:text-emerald-800 transition"
+                    >
                       <span>View Typical Waits</span>
-                      <ArrowRight className="w-3.5 h-3.5" />
-                    </span>
+                      <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
+                    </Link>
                   </div>
-                </Link>
+                </div>
               );
             })}
           </div>
@@ -491,6 +537,72 @@ export const HomePage = () => {
           </div>
         </div>
       </section>
+
+      {/* Delete Confirmation Modal */}
+      {placeToDelete && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="delete-home-place-title"
+        >
+          <div className="bg-white rounded-3xl border border-slate-200 p-6 sm:p-8 max-w-md w-full shadow-2xl space-y-5 animate-in zoom-in-95 duration-200">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-2xl bg-rose-50 border border-rose-100 flex items-center justify-center flex-shrink-0 text-rose-600">
+                <AlertTriangle className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 id="delete-home-place-title" className="text-lg font-black text-slate-900">
+                  Remove Service Place?
+                </h3>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Permanent removal from LocalWait Times
+                </p>
+              </div>
+            </div>
+
+            <div className="bg-slate-50 rounded-2xl p-4 border border-slate-100 text-xs text-slate-600 space-y-2 leading-relaxed">
+              <p>
+                Are you sure you want to permanently remove{' '}
+                <strong className="text-slate-900 font-bold">{placeToDelete.name}</strong>?
+              </p>
+              <p className="text-rose-600 font-medium">
+                ⚠️ This will also delete all{' '}
+                <strong>{placeToDelete.reportCount || 0} user-reported wait records</strong> submitted for this place.
+              </p>
+            </div>
+
+            <div className="flex items-center justify-end gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setPlaceToDelete(null)}
+                disabled={isDeleting}
+                className="px-4 py-2.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-700 hover:bg-slate-50 transition disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmDelete}
+                disabled={isDeleting}
+                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold shadow-md shadow-rose-600/20 transition disabled:opacity-50"
+              >
+                {isDeleting ? (
+                  <>
+                    <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    <span>Removing...</span>
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="w-4 h-4" />
+                    <span>Yes, Remove Place</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
